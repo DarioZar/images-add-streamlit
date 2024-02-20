@@ -1,12 +1,24 @@
 import streamlit as st
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib_scalebar.scalebar import ScaleBar
 
 def translate_image(image, x, y):
     # Create the translation matrix
     M = np.float32([[1, 0, x], [0, 1, y]])
     # Apply the affine transformation
     return cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))
+
+def plot_image(image, scale):
+    fig, ax = plt.subplots()
+    ax.imshow(image)
+    ax.axis("off")
+    if scale["choice"]:
+        scalebar = ScaleBar(1/scale["pixels"], "um", box_alpha=0.8,
+                            border_pad=scale["pad"], location=scale["loc"])
+        ax.add_artist(scalebar)
+    return fig, ax
 
 def mean_filter(image, n):
     # Create a kernel for the mean of n neighbours
@@ -73,6 +85,14 @@ if gray_image is not None and pump_image is not None and whitelight_image is not
             white["x"] = st.slider("Whitelight Translate X", -shp[0], shp[0], 0, 1)
             white["y"] = st.slider("Whitelight Translate Y", -shp[1], shp[1], 0, 1)
 
+        scale = {}
+        scale["choice"] = st.checkbox("Scale bar")
+        if scale["choice"]:
+            with st.expander("Scale bar"):
+                scale["pixels"] = st.number_input("Pixels per μm", 1, shp[0], 26, 1)
+                scale["pad"] = st.slider("Padding", 0., 5., 1., 0.5)
+                scale["loc"] = st.selectbox("Location", ["upper right", "upper left", "lower right", "lower left", "upper center", "lower center", "center right", "center left", "center"])
+
         # Checkbox for mean filter
         use_mean_filter = st.checkbox("Use Mean Filter")
         # Neighbours slider
@@ -85,7 +105,8 @@ if gray_image is not None and pump_image is not None and whitelight_image is not
         if gray_image is not None:
             result_image = apply_image_processing(gray_image, pump_image, whitelight_image,
                                                   pump, white, use_mean_filter, n_mean)
-            # Display processed image
-            st.image(result_image, caption='Processed Image', use_column_width=True)
+            # Plot processed image
+            fig, ax = plot_image(result_image, scale)
+            st.pyplot(fig, bbox_inches='tight', pad_inches=0)
 else:
     st.warning("Please upload all three images.")
